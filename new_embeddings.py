@@ -6,9 +6,10 @@ import timm
 from PIL import Image
 import torch
 from timm.data import resolve_data_config, create_transform
+from tqdm import tqdm
 
 
-def main(directory, output_dir, output_name, embedding_model, batch_size):
+def create_new_embeddings(directory, output_dir, output_name, embedding_model, batch_size):
     """
     Main function to generate embeddings for images using a deep learning model.
 
@@ -20,6 +21,7 @@ def main(directory, output_dir, output_name, embedding_model, batch_size):
         batch_size (int): Number of images to process in each batch.
     """
     image_data = []
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     # Get the list of image files sorted numerically based on filename
     file_list = sorted([file for file in os.listdir(directory)], key=lambda x: int(x.split(".")[0]))
@@ -30,15 +32,15 @@ def main(directory, output_dir, output_name, embedding_model, batch_size):
         config = resolve_data_config({}, model=model)
         transform = create_transform(**config)
     else:
-        model = timm.create_model('inception_resnet_v2', pretrained=True).to("cuda")
+        model = timm.create_model("timm/vit_large_patch14_clip_336.openai", pretrained=True).to(device)
         model.eval()
-        model.classif = torch.nn.Identity()
+        model.classifier = torch.nn.Identity()
 
         config = resolve_data_config({}, model=model)
         transform = create_transform(**config)
 
     # Process images in batches
-    for i in range(0, len(file_list), batch_size):
+    for i in tqdm(range(0, len(file_list), batch_size)):
         batch_files = file_list[i:i + batch_size]
 
         # Load images and convert to RGB
@@ -47,8 +49,8 @@ def main(directory, output_dir, output_name, embedding_model, batch_size):
         # Apply transformation to images
         batch_tensors = [transform(img) for img in img_batch]
 
-        # Convert batch to a single tensor and move to GPU
-        batch_tensors = torch.stack(batch_tensors).to('cuda')
+        # Convert batch to a single tensor and move to GPU if available
+        batch_tensors = torch.stack(batch_tensors).to(device)
 
         # Perform batch inference to extract embeddings
         with torch.no_grad():
@@ -68,3 +70,8 @@ def main(directory, output_dir, output_name, embedding_model, batch_size):
         pickle.dump(image_data, f)
 
     print(f"Embeddings saved to {os.path.join(output_dir, output_name)}")
+
+if __name__ == '__main__':
+    # Example usage
+    create_new_embeddings(directory="ALL/", output_dir="embeddings/", output_name="img_vectors.pkl",
+                          embedding_model=None, batch_size=32)

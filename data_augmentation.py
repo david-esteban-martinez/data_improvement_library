@@ -14,7 +14,11 @@ from torchvision import transforms
 TRANSFORMATIONS = {
     "random_perspective": transforms.RandomPerspective(p=1),
     "gaussian_blur": transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 5)),
-    "random_erase": transforms.RandomErasing(p=1, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0)
+    "random_erase": transforms.Compose([
+        transforms.ToTensor(),
+        transforms.RandomErasing(p=1, scale=(0.02, 0.2), ratio=(0.3, 3.3), value=0),
+        transforms.ToPILImage()
+    ])
 }
 
 
@@ -30,16 +34,11 @@ def X_transform(img, apply_all=False):
         Transformed image(s) as PIL.Image.
     """
     if apply_all:
-        return [t(img) for t in TRANSFORMATIONS.values()]
+        return [t(img) for t in TRANSFORMATIONS.values() if t]
     else:
         # Apply one randomly selected transformation
         random_key = random.choice(list(TRANSFORMATIONS.keys()))
-        if random_key == "random_erase":
-            img = transforms.ToTensor()(img)
-            img = TRANSFORMATIONS[random_key](img)
-            img = transforms.ToPILImage()(img)
-        else:
-            img = TRANSFORMATIONS[random_key](img)
+        img = TRANSFORMATIONS[random_key](img)
         return img
 
 
@@ -63,6 +62,9 @@ def transform_image(filename, directory, num_images, transform, apply_all=False,
     img = Image.open(filepath).convert('RGB')
     samples = []
     user, restaurant = filename.split("_")[:2]
+    user = ''.join(filter(str.isdigit,user))
+    restaurant = ''.join(filter(str.isdigit,restaurant))
+
 
     if not no_aug:
         transformed_images = X_transform(img, apply_all=apply_all)
@@ -228,8 +230,8 @@ def getSamplesDifferentRestaurant(data_user, data):
     return data_user
 
 
-def main(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN_IMG",
-         embedding_model=None, no_aug=False, batch_size=32, apply_all=False, labels=None):
+def augment_data(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN_IMG",
+                 embedding_model=None, no_aug=False, batch_size=32, apply_all=False, labels=None):
     """
     Main function to process images, apply transformations, and balance the dataset.
 
@@ -246,6 +248,7 @@ def main(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN_IMG",
         labels (list, optional): Column labels for the dataset.
     """
     # Load image metadata and embeddings
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     images = pickle.load(open(data_dir, "rb"))
     image_vec = pickle.load(open(vector_dir, "rb"))
     if labels is None:
@@ -261,7 +264,7 @@ def main(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN_IMG",
         config = resolve_data_config({}, model=model)
         transform = create_transform(**config)
     else:
-        model = timm.create_model("timm/vit_large_patch14_clip_336.openai", pretrained=True).to("cuda")
+        model = timm.create_model("timm/vit_large_patch14_clip_336.openai", pretrained=True).to(device)
         model.eval()
         model.classifier = torch.nn.Identity()
         config = resolve_data_config({}, model=model)
@@ -273,7 +276,7 @@ def main(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN_IMG",
     batch_list = []
 
     # Process images in batches
-    for i in range(0, len(file_list), batch_size):
+    for i in tqdm(range(0, len(file_list), batch_size)):
         batch_files = file_list[i:i + batch_size]
         results, num_failures = process_images(batch_files, image_dir, num_images, transform, apply_all, no_aug)
         num_images += batch_size * (len(TRANSFORMATIONS) if apply_all else 1)
@@ -285,8 +288,8 @@ def main(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN_IMG",
             batch_tensors.extend(tensors)
 
         # Convert batch of transformed images to tensor and extract embeddings
-        batch_tensors = torch.stack(batch_tensors).to('cuda')
-        with torch.amp.autocast("cuda"), torch.no_grad():
+        batch_tensors = torch.stack(batch_tensors).to(device)
+        with torch.amp.autocast(device), torch.no_grad():
             batch_out = model(batch_tensors)
 
         # Append new image data to dataset
@@ -305,3 +308,9 @@ def main(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN_IMG",
     print("Processing complete. Data saved successfully.")
 
 
+if __name__ == '__main__':
+    #Example usage
+    augment_data(data_dir="data/gijon/data_10+10/TRAIN_DEV_IMG", vector_dir="data/gijon/data_10+10/IMG_VEC",
+                     image_dir="TRAIN_DEV_images/", output_dir="processed_data/",
+                     output_name="TRAIN_IMG", embedding_model=None,
+                     no_aug=False, batch_size=4, apply_all=True, labels=None)

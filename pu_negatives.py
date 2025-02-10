@@ -99,19 +99,21 @@ def centroid_users(data, vectores, centroid, factor):
     user_distances = np.zeros(len(user_ids))
     img_ids = data["id_img"].to_numpy()[:, None]
 
-    for idx, user_id in enumerate(user_ids):
+    for user_id in user_ids:
         user_indices = np.where(data["id_user"] == user_id)[0]
         vect = vectores[img_ids[user_indices]]
         user_centroid = np.mean(vect, axis=0)
-        user_centroids[idx] = user_centroid
+        user_centroids[user_id] = user_centroid
+
+        vect = np.squeeze(vect, axis=1)
 
         # Compute cosine distances
         norm = np.linalg.norm(vect, axis=1) * np.linalg.norm(user_centroid)
-        distances = np.dot(vect, user_centroid) / norm
+        distances = np.dot(vect, np.squeeze(user_centroid)) / norm
 
         # Compute percentile threshold
         p90 = np.percentile(distances, centroid)
-        user_distances[idx] = p90 / factor
+        user_distances[user_id] = p90 / factor
 
     return user_centroids, user_distances
 
@@ -167,7 +169,8 @@ def getSamplesSameRestaurantCentroid(data_rest, centroid_ids, p90, vectores):
 
     new_negatives = np.random.randint(len(data_rest), size=len(data_rest))
     counter = 0
-    centr = np.squeeze(centroid_ids[user_ids.flatten()], axis=(1))
+    centr = centroid_ids[user_ids.flatten()]
+    # centr = np.squeeze(centroid_ids[user_ids.flatten()], axis=(1))
 
     while True:
         # Identify invalid samples that belong to the same user or exceed similarity threshold
@@ -192,7 +195,7 @@ def getSamplesSameRestaurantCentroid(data_rest, centroid_ids, p90, vectores):
     return data_rest
 
 
-def main(data_file, vector_file, outdir_name, centroid=90, factor=1., labels=None):
+def resample_negatives(data_file, vector_file, outdir_name, centroid=90, factor=1., labels=None):
     """
     Main function to generate negative samples and balance dataset.
 
@@ -234,3 +237,7 @@ def main(data_file, vector_file, outdir_name, centroid=90, factor=1., labels=Non
     print("Saving processed dataset...")
     new_dataframe.to_pickle(os.path.join(outdir_name, "TRAIN_IMG"))
     print("Process completed successfully.")
+
+if __name__ == '__main__':
+    resample_negatives(data_file="data/gijon/data_10+10/TRAIN_DEV_IMG", vector_file="data/gijon/data_10+10/IMG_VEC",
+                       outdir_name="processed_data/", centroid=90, factor=1.0)

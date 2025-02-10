@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from numpy.random import randint
-from pytorch_lightning.callbacks import EarlyStopping, Callback
+from pytorch_lightning.callbacks import Callback
 
 
-class CallbackEnd(Callback):
+class CallbackEndPositives(Callback):
     """
     Custom callback for PyTorch Lightning that updates user centroids and
     resamples positive samples at the end of each training epoch.
@@ -59,10 +59,9 @@ def centroid_users(data: pd.DataFrame, vectors: np.ndarray, labels: list = None)
               inplace=True)
     user_ids = data["id_user"]
     user_centroids = {}
-    user_distances = {}
     img_ids = data["id_img"].to_numpy()[:, None]
 
-    for user_id in user_ids.unique():
+    for user_id in tqdm(user_ids.unique()):
         user_indices = np.where(data["id_user"] == user_id)[0]
         vect = vectors[img_ids[user_indices]]
 
@@ -87,7 +86,7 @@ def resample_positives(dataframe: pd.DataFrame, centroids: dict, k: int = 3):
     tqdm.pandas()
     new_positives = []
 
-    for user in dataframe["id_user"].unique():
+    for user in tqdm(dataframe["id_user"].unique()):
         # Randomly select 100 users to compute similarity
         random_users = np.random.randint(0, len(centroids), size=100)
         vect = [centroids[x] for x in random_users]
@@ -121,3 +120,14 @@ def resample_positives(dataframe: pd.DataFrame, centroids: dict, k: int = 3):
     new_dataframe = pd.concat([dataframe, pd.DataFrame(new_positives)])
     new_dataframe = new_dataframe.reset_index(drop=True)
     return new_dataframe
+
+if __name__ == '__main__':
+    #Example usage
+    dataframe = pd.read_pickle("data/gijon/data_10+10/TRAIN_DEV_IMG")
+
+    image_vectors = np.load("data/gijon/data_10+10/IMG_VEC", allow_pickle=True)
+    centroids = centroid_users(dataframe, image_vectors)
+
+    new_dataframe = resample_positives(dataframe, centroids, 3)
+
+    new_dataframe.to_pickle("processed_data/balanced_dataset.pkl")
