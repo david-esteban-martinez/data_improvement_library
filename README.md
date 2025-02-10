@@ -167,5 +167,3 @@ new_dataframe = resample_positives(dataframe, centroids, 3)
 new_dataframe.to_pickle("processed_data/balanced_dataset.pkl")
 ```
 
-This README provides a comprehensive guide on using the modules in this library. Each section explains the required inputs, expected outputs, and provides working examples to facilitate integration into your workflow.
-
