@@ -1,3 +1,48 @@
+"""
+Image Augmentation and Processing Module
+
+This module provides functions for applying transformations to images,
+generating augmented datasets, and extracting image embeddings using a
+pretrained model. It is designed for processing user-restaurant images,
+augmenting them with transformations, and balancing datasets by generating
+negative samples.
+
+Key Features:
+- Applies predefined image transformations (perspective, blur, erasing).
+- Loads and processes image files in batches.
+- Extracts embeddings using a pretrained vision model.
+- Balances datasets with positive and negative samples.
+- Saves processed image metadata and embeddings.
+
+Functions:
+- `x_transform(img, apply_all=False)`: Applies a random or all transformations to an image.
+- `transform_image(filename, directory, num_images, transform, apply_all, no_aug)`: Loads and augments an image.
+- `process_images(file_list, directory, num_images, transform, apply_all, no_aug)`: Processes a batch of images.
+- `include_negatives(data_add, data_search)`: Generates negative samples.
+- `get_samples_same_restaurant(data_rest)`: Creates negative samples within the same restaurant.
+- `get_samples_different_restaurant(data_user, data)`: Creates negative samples from different restaurants.
+- `augment_data(data_dir, vector_dir, image_dir, output_dir, output_name,
+    embedding_model, no_aug, batch_size, apply_all, labels)`:
+        Main function to process, transform, and save images.
+
+Example Usage:
+    augment_data(
+        data_dir="data/gijon/data_10+10/TRAIN_DEV_IMG",
+        vector_dir="data/gijon/data_10+10/IMG_VEC",
+        image_dir="TRAIN_DEV_images/",
+        output_dir="processed_data/",
+        output_name="TRAIN_IMG",
+        embedding_model=None,
+        no_aug=False,
+        batch_size=4,
+        apply_all=True,
+        labels=None
+    )
+
+Dependencies:
+- os, pickle, random, tqdm, numpy, pandas, timm, PIL, torch, torchvision
+"""
+
 import os
 import pickle
 import random
@@ -22,7 +67,7 @@ TRANSFORMATIONS = {
 }
 
 
-def X_transform(img, apply_all=False):
+def x_transform(img, apply_all=False):
     """
     Applies a random transformation to the given image.
 
@@ -59,15 +104,14 @@ def transform_image(filename, directory, num_images, transform, apply_all=False,
         list: List of transformed image tensors.
     """
     filepath = os.path.join(directory, filename)
-    img = Image.open(filepath).convert('RGB')
+    img = Image.open(filepath).convert("RGB")
     samples = []
     user, restaurant = filename.split("_")[:2]
-    user = ''.join(filter(str.isdigit,user))
-    restaurant = ''.join(filter(str.isdigit,restaurant))
-
+    user = "".join(filter(str.isdigit, user))
+    restaurant = "".join(filter(str.isdigit, restaurant))
 
     if not no_aug:
-        transformed_images = X_transform(img, apply_all=apply_all)
+        transformed_images = x_transform(img, apply_all=apply_all)
         if not isinstance(transformed_images, list):
             transformed_images = [transformed_images]
         for _ in transformed_images:
@@ -141,7 +185,7 @@ def include_negatives(data_add, data_search):
     for _ in range(1):
         neg_samples = (
             data_add.groupby("id_user", group_keys=False)
-            .progress_apply(lambda x: getSamplesDifferentRestaurant(x, data_search))
+            .progress_apply(lambda x: get_samples_different_restaurant(x, data_search))
             .reset_index(drop=True)
         )
         dictionary_dataframe.extend(neg_samples.to_dict(orient="records"))
@@ -156,7 +200,7 @@ def include_negatives(data_add, data_search):
     for _ in range(1):
         same_res_bpr_samples = (
             data.groupby("id_restaurant", group_keys=False)
-            .progress_apply(lambda x: getSamplesSameRestaurant(x))
+            .progress_apply(get_samples_same_restaurant)
             .reset_index(drop=True)
         )
         dictionary_dataframe.extend(same_res_bpr_samples.to_dict(orient="records"))
@@ -167,7 +211,7 @@ def include_negatives(data_add, data_search):
     return dataframe
 
 
-def getSamplesSameRestaurant(data_rest):
+def get_samples_same_restaurant(data_rest):
     """
     Selects negative samples within the same restaurant by reassigning images.
 
@@ -193,7 +237,7 @@ def getSamplesSameRestaurant(data_rest):
     return data_rest
 
 
-def getSamplesDifferentRestaurant(data_user, data):
+def get_samples_different_restaurant(data_user, data):
     """
     Selects negative samples from different restaurants to create a balanced dataset.
 
@@ -244,11 +288,12 @@ def augment_data(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN
         embedding_model (torch model, optional): Pretrained model for embedding extraction.
         no_aug (bool): If True, skips augmentation.
         batch_size (int): Batch size for processing.
-        apply_all (bool): If True, applies all transformations, if False, one transformation is applied randomly to each image.
+        apply_all (bool): If True, applies all transformations,
+         if False, one transformation is applied randomly to each image.
         labels (list, optional): Column labels for the dataset.
     """
     # Load image metadata and embeddings
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     images = pickle.load(open(data_dir, "rb"))
     image_vec = pickle.load(open(vector_dir, "rb"))
     if labels is None:
@@ -298,19 +343,19 @@ def augment_data(data_dir, vector_dir, image_dir, output_dir, output_name="TRAIN
 
     # Convert extracted embeddings to numpy array
     batch_array = np.vstack([t.cpu().numpy() for t in batch_list])
-    image_data = np.vstack([images, batch_array])
+    image_data = np.vstack([image_vec, batch_array])
     os.makedirs(output_dir, exist_ok=True)
 
     # Save updated dataset and embeddings
     images.to_pickle(f"{output_dir}/{output_name}")
-    with open(f"{output_dir}/IMG_VEC", 'wb') as f:
+    with open(f"{output_dir}/IMG_VEC", "wb") as f:
         pickle.dump(image_data, f)
     print("Processing complete. Data saved successfully.")
 
 
-if __name__ == '__main__':
-    #Example usage
-    augment_data(data_dir="data/gijon/data_10+10/TRAIN_DEV_IMG", vector_dir="data/gijon/data_10+10/IMG_VEC",
-                     image_dir="TRAIN_DEV_images/", output_dir="processed_data/",
-                     output_name="TRAIN_IMG", embedding_model=None,
-                     no_aug=False, batch_size=4, apply_all=True, labels=None)
+if __name__ == "__main__":
+    # Example usage
+    augment_data(data_dir="data_improvement_library/data_10+10/TRAIN_DEV_IMG", vector_dir="data_improvement_library/data_10+10/IMG_VEC",
+                 image_dir="data_improvement_library/TRAIN_DEV/", output_dir="processed_data/",
+                 output_name="TRAIN_IMG", embedding_model=None,
+                 no_aug=False, batch_size=4, apply_all=True, labels=None)

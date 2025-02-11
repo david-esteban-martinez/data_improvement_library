@@ -1,3 +1,40 @@
+"""
+Negative Sampling and User Centroid Computation Module
+
+This module processes user interaction data and generates negative samples
+for machine learning tasks. It computes user centroids using image embeddings
+and selects negative samples based on similarity thresholds.
+
+Key Features:
+- Loads user interaction data and image embeddings.
+- Computes user centroids and 90th percentile similarity thresholds.
+- Generates negative samples from both different and same restaurants.
+- Ensures balanced positive and negative samples for training.
+
+Functions:
+- `get_pickle(path, name)`: Loads a pickle file from a specified directory.
+- `cr_vsm(data, vectores, centroid, factor)`: Generates negative samples and balances data.
+- `centroid_users(data, vectores, centroid, factor)`: Computes user centroids and distance thresholds.
+- `get_samples_different_restaurant_centroid(data_user, data, centroid_ids, p90, vectores)`:
+  Generates negative samples from different restaurants.
+- `get_samples_same_restaurant_centroid(data_rest, centroid_ids, p90, vectores)`:
+  Generates negative samples within the same restaurant.
+- `resample_negatives(data_file, vector_file, outdir_name, centroid, factor, labels)`:
+  Main function to process data, generate negatives, and save the dataset.
+
+Example Usage:
+    resample_negatives(
+        data_file="data/gijon/data_10+10/TRAIN_DEV_IMG",
+        vector_file="data/gijon/data_10+10/IMG_VEC",
+        outdir_name="processed_data/",
+        centroid=90,
+        factor=1.0
+    )
+
+Dependencies:
+- os, numpy, pandas, pickle, tqdm
+"""
+
 import os
 import numpy as np
 import pandas as pd
@@ -21,7 +58,7 @@ def get_pickle(path, name):
     return data
 
 
-def CR_VSM(data, vectores, centroid, factor):
+def cr_vsm(data, vectores, centroid, factor):
     """
     Generates negative samples by computing user centroids and selecting negatives
     from different and same restaurants.
@@ -45,7 +82,8 @@ def CR_VSM(data, vectores, centroid, factor):
     for _ in range(10):
         neg_samples = (
             data.groupby("id_user", group_keys=False)
-            .progress_apply(lambda x: getSamplesDifferentRestaurantCentroid(x, data, centroids, distances, vectores))
+            .progress_apply(
+                lambda x: get_samples_different_restaurant_centroid(x, data, centroids, distances, vectores))
             .reset_index(drop=True)
         )
         dictionary_dataframe.extend(neg_samples.to_dict(orient="records"))
@@ -59,7 +97,7 @@ def CR_VSM(data, vectores, centroid, factor):
     for _ in range(10):
         same_res_bpr_samples = (
             data.groupby("id_restaurant", group_keys=False)
-            .progress_apply(lambda x: getSamplesSameRestaurantCentroid(x, centroids, distances, vectores))
+            .progress_apply(lambda x: get_samples_same_restaurant_centroid(x, centroids, distances, vectores))
             .reset_index(drop=True)
         )
         dictionary_dataframe.extend(same_res_bpr_samples.to_dict(orient="records"))
@@ -118,7 +156,7 @@ def centroid_users(data, vectores, centroid, factor):
     return user_centroids, user_distances
 
 
-def getSamplesDifferentRestaurantCentroid(data_user, data, centroid_ids, p90, vectores):
+def get_samples_different_restaurant_centroid(data_user, data, centroid_ids, p90, vectores):
     """
     Generates negative samples from different restaurants while ensuring they are
     dissimilar to the user's centroid.
@@ -159,7 +197,7 @@ def getSamplesDifferentRestaurantCentroid(data_user, data, centroid_ids, p90, ve
     return data_user
 
 
-def getSamplesSameRestaurantCentroid(data_rest, centroid_ids, p90, vectores):
+def get_samples_same_restaurant_centroid(data_rest, centroid_ids, p90, vectores):
     """
     Generates negative samples within the same restaurant, ensuring they differ
     based on the user's centroid similarity threshold.
@@ -222,10 +260,10 @@ def resample_negatives(data_file, vector_file, outdir_name, centroid=90, factor=
 
     # Filter out entries where take is 0
     df = df[df["take"] != 0]
-    df = df.drop_duplicates(subset=["id_img"], keep='first')
+    df = df.drop_duplicates(subset=["id_img"], keep="first")
 
     print("Generating negative samples...")
-    new_dataframe = CR_VSM(df, vectores, centroid, factor).reset_index(drop=True)
+    new_dataframe = cr_vsm(df, vectores, centroid, factor).reset_index(drop=True)
 
     os.makedirs(outdir_name, exist_ok=True)
 
@@ -238,6 +276,7 @@ def resample_negatives(data_file, vector_file, outdir_name, centroid=90, factor=
     new_dataframe.to_pickle(os.path.join(outdir_name, "TRAIN_IMG"))
     print("Process completed successfully.")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     resample_negatives(data_file="data/gijon/data_10+10/TRAIN_DEV_IMG", vector_file="data/gijon/data_10+10/IMG_VEC",
                        outdir_name="processed_data/", centroid=90, factor=1.0)

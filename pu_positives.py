@@ -1,3 +1,35 @@
+"""
+User Centroid Computation and Positive Sample Resampling for PyTorch Lightning
+
+This module defines a PyTorch Lightning callback that updates user centroids
+and resamples positive samples at the end of each training epoch. It helps
+balance the dataset by selecting new positive interactions based on user similarity.
+
+Key Features:
+- Computes user centroids from image embeddings.
+- Selects new positive samples based on user similarity.
+- Integrates as a PyTorch Lightning callback for automatic updates.
+
+Classes:
+- `CallbackEndPositives`: Custom PyTorch Lightning callback to update centroids
+  and resample positive samples.
+
+Functions:
+- `centroid_users(data, vectors, labels)`: Computes user centroids from embeddings.
+- `resample_positives(dataframe, centroids, k)`: Generates new positive samples
+  for users based on centroid similarity.
+
+Example Usage:
+    from pytorch_lightning import Trainer
+    from my_module import CallbackEndPositives
+
+    trainer = Trainer(callbacks=[CallbackEndPositives()])
+    trainer.fit(model, datamodule)
+
+Dependencies:
+- numpy, pandas, tqdm, pytorch_lightning
+"""
+
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -33,7 +65,7 @@ class CallbackEndPositives(Callback):
         """
         original_embeddings = trainer.train_dataloader.dataset.datamodule.image_embeddings
         dataframe = trainer.train_dataloader.dataset.dataframe
-        dataframe = dataframe.drop_duplicates(keep='first').reset_index(drop=True)
+        dataframe = dataframe.drop_duplicates(keep="first").reset_index(drop=True)
 
         new_centroids = centroid_users(dataframe, original_embeddings.cpu().detach().numpy())
         trainer.train_dataloader.dataset.pu_dataset = resample_positives(dataframe, new_centroids)
@@ -56,7 +88,7 @@ def centroid_users(data: pd.DataFrame, vectors: np.ndarray, labels: list = None)
         labels = ["id_user", "id_img"]
 
     data.rename(columns={labels[0]: "id_user", labels[1]: "id_img"},
-              inplace=True)
+                inplace=True)
     user_ids = data["id_user"]
     user_centroids = {}
     img_ids = data["id_img"].to_numpy()[:, None]
@@ -121,8 +153,9 @@ def resample_positives(dataframe: pd.DataFrame, centroids: dict, k: int = 3):
     new_dataframe = new_dataframe.reset_index(drop=True)
     return new_dataframe
 
-if __name__ == '__main__':
-    #Example usage
+
+if __name__ == "__main__":
+    # Example usage preprocessing
     dataframe = pd.read_pickle("data/gijon/data_10+10/TRAIN_DEV_IMG")
 
     image_vectors = np.load("data/gijon/data_10+10/IMG_VEC", allow_pickle=True)

@@ -1,3 +1,32 @@
+"""
+Image Embedding Generation Module
+
+This module processes images and generates feature embeddings using a pretrained deep learning model.
+It loads image files, applies transformations, and extracts embeddings in batches to optimize performance.
+
+Key Features:
+- Loads images from a specified directory and applies preprocessing.
+- Uses a Vision Transformer (ViT) model for feature extraction.
+- Supports batch processing for efficiency.
+- Saves extracted embeddings in a pickle file for later use.
+
+Functions:
+- `create_new_embeddings(directory, output_dir, output_name, embedding_model, batch_size)`:
+  Processes images, extracts embeddings, and saves them.
+
+Example Usage:
+    create_new_embeddings(
+        directory="ALL/",
+        output_dir="embeddings/",
+        output_name="img_vectors.pkl",
+        embedding_model=None,
+        batch_size=32
+    )
+
+Dependencies:
+- os, pickle, numpy, timm, PIL, torch, tqdm
+"""
+
 import os
 import pickle
 
@@ -17,11 +46,12 @@ def create_new_embeddings(directory, output_dir, output_name, embedding_model, b
         directory (str): Path to the directory containing image files.
         output_dir (str): Path where the processed embeddings will be stored.
         output_name (str): Name of the output file.
-        embedding_model (torch.nn.Module or None): Pretrained model for embedding extraction. If None, a default model is used.
+        embedding_model (torch.nn.Module or None): Pretrained model for embedding extraction.
+         If None, a default model is used.
         batch_size (int): Number of images to process in each batch.
     """
     image_data = []
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Get the list of image files sorted numerically based on filename
     file_list = sorted([file for file in os.listdir(directory)], key=lambda x: int(x.split(".")[0]))
@@ -44,7 +74,7 @@ def create_new_embeddings(directory, output_dir, output_name, embedding_model, b
         batch_files = file_list[i:i + batch_size]
 
         # Load images and convert to RGB
-        img_batch = [Image.open(os.path.join(directory, filename)).convert('RGB') for filename in batch_files]
+        img_batch = [Image.open(os.path.join(directory, filename)).convert("RGB") for filename in batch_files]
 
         # Apply transformation to images
         batch_tensors = [transform(img) for img in img_batch]
@@ -66,12 +96,13 @@ def create_new_embeddings(directory, output_dir, output_name, embedding_model, b
     os.makedirs(output_dir, exist_ok=True)
 
     # Save the generated embeddings as a pickle file
-    with open(os.path.join(output_dir, output_name), 'wb') as f:
+    with open(os.path.join(output_dir, output_name), "wb") as f:
         pickle.dump(image_data, f)
 
     print(f"Embeddings saved to {os.path.join(output_dir, output_name)}")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     # Example usage
     create_new_embeddings(directory="ALL/", output_dir="embeddings/", output_name="img_vectors.pkl",
                           embedding_model=None, batch_size=32)

@@ -26,13 +26,13 @@ This module does not produce a return value. Instead, it saves the processed dat
 ### Usage Example
 
 ```python
-from data_augmentation import augment_data
+import data_improvement_library
 
 # Process images with data augmentation and embedding extraction
-augment_data(data_dir="data/user_data.pkl", vector_dir="data/image_vectors.pkl",
-     image_dir="images/", output_dir="processed_data/",
-     output_name="TRAIN_IMG", embedding_model=None,
-     no_aug=False, batch_size=32, apply_all=True, labels=None)
+data_improvement_library.augment_data(data_dir="data/user_data.pkl", vector_dir="data/image_vectors.pkl",
+             image_dir="images/", output_dir="processed_data/",
+             output_name="TRAIN_IMG", embedding_model=None,
+             no_aug=False, batch_size=32, apply_all=True, labels=None)
 ```
 
 ## Embedding Generation Module (`new_embeddings.py`)
@@ -52,11 +52,11 @@ This module does not return a value. Instead, it saves the processed data in `pi
 ### Usage Example
 
 ```python
-from new_embeddings import create_new_embeddings
+import data_improvement_library
 
 # Generate embeddings for a set of images
-create_new_embeddings(directory="images/", output_dir="embeddings/", output_name="img_vectors.pkl",
-     embedding_model=None, batch_size=32)
+data_improvement_library.create_new_embeddings(directory="images/", output_dir="embeddings/", output_name="img_vectors.pkl",
+                      embedding_model=None, batch_size=32)
 ```
 
 ## Negative Selection with PU Learning (`pu_negatives.py`)
@@ -77,11 +77,11 @@ This module does not return a value. Instead, it saves the processed data in `pi
 ### Usage Example
 
 ```python
-from pu_negatives import resample_negatives
+import data_improvement_library
 
 # Generate balanced negative samples
-resample_negatives(data_file="data/user_data.pkl", vector_file="data/image_vectors.pkl",
-     outdir_name="processed_data/", centroid=90, factor=1.0)
+data_improvement_library.resample_negatives(data_file="data/user_data.pkl", vector_file="data/image_vectors.pkl",
+                   outdir_name="processed_data/", centroid=90, factor=1.0)
 ```
 
 ## Positive Selection with PU Learning (`pu_positives.py`)
@@ -108,11 +108,11 @@ For proper functionality, the model must meet the following requirements:
 #### Usage Example
 
 ```python
-from pu_positives import CallbackEndPositives
+import data_improvement_library
 from pytorch_lightning import Trainer
 
 # Create an instance of the callback
-callback_end = CallbackEndPositives()
+callback_end = data_improvement_library.CallbackEndPositives()
 
 # Configure the trainer with the callback
 trainer = Trainer(callbacks=[callback_end])
@@ -147,7 +147,7 @@ For the function `resample_positives`:
 #### Usage Example
 
 ```python
-from pu_positives import centroid_users, resample_positives
+import data_improvement_library
 import pandas as pd
 import numpy as np
 
@@ -158,10 +158,10 @@ dataframe = pd.read_pickle("data/user_data.pkl")
 image_vectors = np.load("data/image_vectors.npy")
 
 # Compute user centroids
-centroids = centroid_users(dataframe, image_vectors)
+centroids = data_improvement_library.centroid_users(dataframe, image_vectors)
 
 # Generate a new dataset with balanced positive samples
-new_dataframe = resample_positives(dataframe, centroids, 3)
+new_dataframe = data_improvement_library.resample_positives(dataframe, centroids, 3)
 
 # Save the processed dataset
 new_dataframe.to_pickle("processed_data/balanced_dataset.pkl")
